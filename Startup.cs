@@ -11,7 +11,7 @@ namespace BuzzerBot
     {
         public override void Configure(IFunctionsHostBuilder builder)
         {
-            var token = Environment.GetEnvironmentVariable("token", EnvironmentVariableTarget.Process);
+            var token = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN", EnvironmentVariableTarget.Process);
 
             if (token == null)
             {
