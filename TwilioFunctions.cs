@@ -23,7 +23,7 @@ namespace BuzzerBot
         }
 
         [FunctionName("TwilioHttpTrigger")]
-        public async Task<IActionResult> Run(
+        public async Task<IActionResult> TwilioHttpTrigger(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest request,
             [DurableClient] IDurableOrchestrationClient client,
             ILogger log)
