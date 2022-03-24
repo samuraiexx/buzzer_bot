@@ -48,7 +48,7 @@ namespace BuzzerBot
                 switch(update.Type)
                 {
                     case UpdateType.Message:
-                        await HandleMessage(update.Message, queueClient);
+                        HandleMessage(update.Message, queueClient);
                         break;
                     case UpdateType.CallbackQuery:
                         await HandleCallbackQuery(update.CallbackQuery, client);
@@ -66,8 +66,8 @@ namespace BuzzerBot
         }
 
         [FunctionName("RequestBuzzerApproval")]
-        public async Task<IActionResult> RequestBuzzerApproval(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest request,
+        public async Task RequestBuzzerApproval(
+            [ActivityTrigger] IDurableActivityContext context,
             [Queue("acceptEntranceQueue")] QueueClient queueClient,
             [DurableClient] IDurableOrchestrationClient client)
         {
@@ -77,9 +77,9 @@ namespace BuzzerBot
             {
                 queueClient.DeleteMessage(message.Value.MessageId, message.Value.PopReceipt);
                 await UpdateRequest(true, client);
-                await this.telegramBotClient.SendTextMessageAsync(chatId: this.chatId, "Request Accepted");
+                await this.telegramBotClient.SendTextMessageAsync(this.chatId, "Request Accepted");
 
-                return new OkResult();
+                return;
             }
 
             InlineKeyboardMarkup inlineKeyboard = new(
@@ -99,7 +99,7 @@ namespace BuzzerBot
                 replyMarkup: inlineKeyboard
             );
 
-            return new OkResult();
+            return;
         }
 
         private async Task UpdateRequest(bool accepted, IDurableOrchestrationClient client)
@@ -133,7 +133,7 @@ namespace BuzzerBot
             }
         }
 
-        private async Task HandleMessage(Message message, QueueClient queueClient)
+        private void HandleMessage(Message message, QueueClient queueClient)
         {
             if (message.Entities != null && message.Entities.Length > 0)
             {
@@ -144,13 +144,13 @@ namespace BuzzerBot
 
                     if (commandName.Equals(acceptFirstCallInNextHourCommand, StringComparison.InvariantCultureIgnoreCase))
                     {
-                        await AcceptFirstCallForTimeInterval(60, queueClient);
+                        AcceptFirstCallForTimeInterval(60, queueClient);
                     }
                 }
             }
         }
 
-        private async Task AcceptFirstCallForTimeInterval(int timeIntervalInMinutes, QueueClient queueClient)
+        private void AcceptFirstCallForTimeInterval(int timeIntervalInMinutes, QueueClient queueClient)
         {
             DateTime now = DateTime.Now;
 

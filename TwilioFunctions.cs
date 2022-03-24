@@ -55,7 +55,7 @@ namespace BuzzerBot
             [OrchestrationTrigger] IDurableOrchestrationContext context)
         {
             string callSid = context.GetInput<string>();
-            await context.CallActivityAsync(nameof(SendApprovalRequest), null);
+            await context.CallActivityAsync("RequestBuzzerApproval", null);
 
             using (var timeoutCts = new CancellationTokenSource())
             {
@@ -109,42 +109,6 @@ namespace BuzzerBot
             string callSid = context.GetInput<string>();
             twilioService.SendApprovalFallback(callSid);
         }
-
-        [FunctionName(nameof(ApprovalExample))]
-        public async Task ApprovalExample(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req,
-            [DurableClient] IDurableOrchestrationClient client)
-        {
-            OrchestrationStatusQueryResult result = await client.ListInstancesAsync(
-                new OrchestrationStatusQueryCondition { RuntimeStatus = new [] {OrchestrationRuntimeStatus.Running} },
-                CancellationToken.None
-            );
-
-            string instanceId = result
-                .DurableOrchestrationState
-                .Single()
-                .InstanceId;
-
-            await client.RaiseEventAsync(instanceId, APPROVAL_EVENT, true);
-        }
-
-        [FunctionName(nameof(RejectExample))]
-        public async Task RejectExample(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req,
-            [DurableClient] IDurableOrchestrationClient client)
-        {
-            OrchestrationStatusQueryResult result = await client.ListInstancesAsync(
-                new OrchestrationStatusQueryCondition { RuntimeStatus = new [] {OrchestrationRuntimeStatus.Running} },
-                CancellationToken.None
-            );
-            string instanceId = result
-                .DurableOrchestrationState
-                .Single()
-                .InstanceId;
-
-            await client.RaiseEventAsync(instanceId, APPROVAL_EVENT, false);
-        }
-
         private async Task ClearDurableFunctions(IDurableOrchestrationClient client)
         {
             OrchestrationStatusQueryResult result = await client.ListInstancesAsync(
