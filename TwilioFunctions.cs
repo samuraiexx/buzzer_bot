@@ -14,7 +14,7 @@ namespace BuzzerBot
 {
     public class TwilioFunctions
     {
-        const string APPROVAL_EVENT = "ApprovalEvent";
+        public const string APPROVAL_EVENT = "ApprovalEvent";
         private readonly TwilioService twilioService;
 
         public TwilioFunctions(TwilioService twilioServiceParam)
