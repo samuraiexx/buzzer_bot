@@ -116,13 +116,12 @@ namespace BuzzerBot
             [DurableClient] IDurableOrchestrationClient client)
         {
             OrchestrationStatusQueryResult result = await client.ListInstancesAsync(
-                new OrchestrationStatusQueryCondition(),
+                new OrchestrationStatusQueryCondition { RuntimeStatus = new [] {OrchestrationRuntimeStatus.Running} },
                 CancellationToken.None
             );
 
             string instanceId = result
                 .DurableOrchestrationState
-                .Where(instance => instance.RuntimeStatus == OrchestrationRuntimeStatus.Running)
                 .Single()
                 .InstanceId;
 
@@ -135,12 +134,11 @@ namespace BuzzerBot
             [DurableClient] IDurableOrchestrationClient client)
         {
             OrchestrationStatusQueryResult result = await client.ListInstancesAsync(
-                new OrchestrationStatusQueryCondition(),
+                new OrchestrationStatusQueryCondition { RuntimeStatus = new [] {OrchestrationRuntimeStatus.Running} },
                 CancellationToken.None
             );
             string instanceId = result
                 .DurableOrchestrationState
-                .Where(instance => instance.RuntimeStatus == OrchestrationRuntimeStatus.Running)
                 .Single()
                 .InstanceId;
 
