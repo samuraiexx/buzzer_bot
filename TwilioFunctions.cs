@@ -24,18 +24,24 @@ namespace BuzzerBot
 
         [FunctionName("TwilioHttpTrigger")]
         public async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest req,
-            [DurableClient] IDurableOrchestrationClient starter,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest request,
+            [DurableClient] IDurableOrchestrationClient client,
             ILogger log)
         {
+            if(!twilioService.ValidateRequest(request))
+            {
+                return new ForbidResult();
+            }
+
             log.LogInformation("Received a request!");
-            IFormCollection formValues = req.Form;
+            await ClearDurableFunctions(client);
 
             VoiceResponse response = new VoiceResponse()
-                .Play(new Uri("http://demo.twilio.com/docs/classic.mp3"));
+                .Play(new Uri("http://com.twilio.music.guitars.s3.amazonaws.com/Pitx_-_A_Thought.mp3"));
+            // Alternative: http://com.twilio.music.rock.s3.amazonaws.com/nickleus_-_original_guitar_song_200907251723.mp3
 
-            string callSid = formValues["CallSid"];
-            string instanceId = await starter.StartNewAsync(nameof(ApprovalWorkflow), null, callSid);
+            string callSid = request.Form["CallSid"];
+            string instanceId = await client.StartNewAsync(nameof(ApprovalWorkflow), null, callSid);
 
             return new ContentResult {
                 Content = response.ToString(),
@@ -141,19 +147,15 @@ namespace BuzzerBot
             await client.RaiseEventAsync(instanceId, APPROVAL_EVENT, false);
         }
 
-        [FunctionName(nameof(ClearDurableFunctions))]
-        public async Task ClearDurableFunctions(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req,
-            [DurableClient] IDurableOrchestrationClient client)
+        private async Task ClearDurableFunctions(IDurableOrchestrationClient client)
         {
             OrchestrationStatusQueryResult result = await client.ListInstancesAsync(
-                new OrchestrationStatusQueryCondition(),
+                new OrchestrationStatusQueryCondition { RuntimeStatus = new [] {OrchestrationRuntimeStatus.Running} },
                 CancellationToken.None
             );
 
             await Task.WhenAll(result
                 .DurableOrchestrationState
-                .Where(instance => instance.RuntimeStatus == OrchestrationRuntimeStatus.Running)
                 .Select(instance => client.TerminateAsync(instance.InstanceId, "Cleaning all functions"))
             );
         }
