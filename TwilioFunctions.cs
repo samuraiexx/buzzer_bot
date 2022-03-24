@@ -12,12 +12,12 @@ using Twilio.TwiML;
 
 namespace BuzzerBot
 {
-    public class TwilioHttpTrigger
+    public class TwilioFunctions
     {
         const string APPROVAL_EVENT = "ApprovalEvent";
         private readonly TwilioService twilioService;
 
-        public TwilioHttpTrigger(TwilioService twilioServiceParam)
+        public TwilioFunctions(TwilioService twilioServiceParam)
         {
             twilioService = twilioServiceParam;
         }
