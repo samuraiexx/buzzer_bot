@@ -20,6 +20,7 @@ namespace BuzzerBot
 
             builder.Services.AddLogging();
             builder.Services.AddScoped<TwilioService>();
+            builder.Services.AddScoped<TelegramService>();
             builder.Services
                 .AddHttpClient("tgclient")
                 .AddTypedClient<ITelegramBotClient>(httpClient => new TelegramBotClient(token, httpClient));

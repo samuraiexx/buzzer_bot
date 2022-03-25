@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Mvc;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
 using Twilio.Security;
@@ -11,14 +12,13 @@ namespace BuzzerBot
 {
     public class TwilioService
     {
-        private readonly string fallbackNumber;
+        private static readonly string fallbackNumber = Environment.GetEnvironmentVariable("FALLBACK_NUMBER");
         private readonly string authToken;
 
         public TwilioService()
         {
             string accountSid = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
             authToken = Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
-            fallbackNumber = Environment.GetEnvironmentVariable("FALLBACK_NUMBER");
 
             TwilioClient.Init(accountSid, authToken);
         }
@@ -67,7 +67,7 @@ namespace BuzzerBot
             );
         }
 
-        public void SendApprovalFallback(string callSid)
+        public void SendApprovalRequestFallback(string callSid)
         {
             VoiceResponse response = new VoiceResponse()
                 .Dial(fallbackNumber);
@@ -77,6 +77,31 @@ namespace BuzzerBot
                 twiml: response.ToString(),
                 pathSid: callSid 
             );
+        }
+
+        public static ContentResult GetFallbackResponse()
+        {
+            VoiceResponse response = new VoiceResponse()
+                .Dial(fallbackNumber);
+
+            return new ContentResult {
+                Content = response.ToString(),
+                StatusCode = StatusCodes.Status200OK,
+                ContentType = "application/xml"
+            };
+        }
+
+        public static ContentResult GetWaitRoomResponse(string callSid)
+        {
+            VoiceResponse response = new VoiceResponse()
+                .Play(new Uri("http://com.twilio.music.guitars.s3.amazonaws.com/Pitx_-_A_Thought.mp3"));
+            // Alternative: http://com.twilio.music.rock.s3.amazonaws.com/nickleus_-_original_guitar_song_200907251723.mp3
+
+            return new ContentResult {
+                Content = response.ToString(),
+                StatusCode = StatusCodes.Status200OK,
+                ContentType = "application/xml"
+            };
         }
     }
 }
