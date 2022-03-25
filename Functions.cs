@@ -37,13 +37,13 @@ namespace BuzzerBot
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest request,
             [DurableClient] IDurableOrchestrationClient orchestrationClient)
         {
-            if(!twilioService.ValidateRequest(request))
-            {
-                return new ForbidResult();
-            }
-
             try
             {
+                if(!twilioService.ValidateRequest(request))
+                {
+                    return new ForbidResult();
+                }
+
                 logger.LogInformation("Received a request!");
                 string callSid = request.Form["CallSid"];
                 await ClearDurableFunctions(orchestrationClient);
@@ -67,6 +67,11 @@ namespace BuzzerBot
             {
                 string body = await request.ReadAsStringAsync();
                 Update update = JsonConvert.DeserializeObject<Update>(body);
+
+                if(!telegramService.IsValid(update))
+                {
+                    return new ForbidResult();
+                }
 
                 BuzzerEvent action = telegramService.GetBuzzerEventFromUpdate(update);
                 switch(action)

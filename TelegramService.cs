@@ -24,6 +24,12 @@ namespace BuzzerBot
             this.chatId = long.Parse(Environment.GetEnvironmentVariable("TELEGRAM_CHAT_ID", EnvironmentVariableTarget.Process));
         }
 
+        public bool IsValid(Update update)
+        {
+            long? chatId = update.Message?.Chat?.Id ?? update.CallbackQuery?.Message?.Chat?.Id;
+            return chatId == this.chatId;
+        }
+
         public BuzzerEvent GetBuzzerEventFromUpdate(Update update)
         {
             switch(update.Type)
