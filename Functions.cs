@@ -18,7 +18,7 @@ namespace BuzzerBot
 {
     public class Functions
     {
-        public const string APPROVAL_EVENT = "ApprovalEvent";
+        public const string BUZZER_EVENT = "BuzzerEvent";
         private readonly TwilioService twilioService;
         private readonly TelegramService telegramService;
         private readonly ILogger<Functions> logger;
@@ -75,7 +75,7 @@ namespace BuzzerBot
 
                 if(twilioService.HasCallCompleted(body))
                 {
-                    await RaiseBuzzerEvent(BuzzerEvent.COMPLETED, orchestrationClient);
+                    await RaiseBuzzerEvent(orchestrationClient, BuzzerEvent.COMPLETED);
                 }
 
                 return new OkResult();
@@ -103,12 +103,13 @@ namespace BuzzerBot
                     return new ForbidResult();
                 }
 
-                BuzzerEvent action = telegramService.GetBuzzerEventFromUpdate(update);
-                switch(action)
+                (BuzzerEvent buzzerEvent, BuzzerEventPayload payload) = telegramService.GetBuzzerEventFromUpdate(update);
+
+                switch(buzzerEvent)
                 {
                     case BuzzerEvent.APPROVED:
                     case BuzzerEvent.REJECTED:
-                        await RaiseBuzzerEvent(action, orchestrationClient);
+                        await RaiseBuzzerEvent(orchestrationClient, buzzerEvent, payload);
                         break;
                     case BuzzerEvent.SCHEDULE_APPROVAL:
                         await queueClient.SendMessageAsync(DateTime.Now.ToString(), timeToLive: TimeSpan.FromMinutes(60));
@@ -138,23 +139,27 @@ namespace BuzzerBot
                 DateTime dueTime = context.CurrentUtcDateTime.AddSeconds(30);
                 Task durableTimeout = context.CreateTimer(dueTime, timeoutCts.Token);
 
-                Task<BuzzerEvent> approvalEvent = context.WaitForExternalEvent<BuzzerEvent>(APPROVAL_EVENT);
+                Task<(BuzzerEvent, BuzzerEventPayload)> approvalEvent = context.WaitForExternalEvent<(BuzzerEvent, BuzzerEventPayload)>(BUZZER_EVENT);
                 Task firedEvent = await Task.WhenAny(approvalEvent, durableTimeout);
                 BuzzerEvent buzzerEvent;
+                BuzzerEventPayload payload;
 
                 if (firedEvent == approvalEvent)
                 {
                     timeoutCts.Cancel();
-                    buzzerEvent = approvalEvent.Result;
+                    (buzzerEvent, payload) = approvalEvent.Result;
                 }
                 else
                 {
                     buzzerEvent = BuzzerEvent.TIMEOUT;
+                    payload = new BuzzerEventPayload();
                 }
-                await context.CallActivityAsync(nameof(ProcessBuzzerEvent), (buzzerEvent, callSid, messageId));
+
+                payload.TelegramMessageId = messageId;
+                await context.CallActivityAsync(nameof(ProcessBuzzerEvent), (buzzerEvent, callSid, payload));
             } catch (Exception e)
             {
-                await context.CallActivityAsync(nameof(ProcessBuzzerEvent), (BuzzerEvent.ERROR, callSid, (int?)null));
+                await context.CallActivityAsync(nameof(ProcessBuzzerEvent), (BuzzerEvent.ERROR, callSid, new BuzzerEventPayload()));
                 logger.LogError("[ApprovalWorkflow] Exception: " + e.Message);
             }
         }
@@ -163,28 +168,28 @@ namespace BuzzerBot
         public async Task ProcessBuzzerEvent([ActivityTrigger] IDurableActivityContext context)
         {
             logger.LogInformation("Processing Approval");
-            (BuzzerEvent buzzerEvent, string callSid, int? messageId) = context.GetInput<(BuzzerEvent, string, int?)>();
+            (BuzzerEvent buzzerEvent, string callSid, BuzzerEventPayload payload) = context.GetInput<(BuzzerEvent, string, BuzzerEventPayload)>();
 
             switch (buzzerEvent)
             {
                 case BuzzerEvent.APPROVED:
                     twilioService.SendOpenDoorSignal(callSid);
-                    await telegramService.SendOrUpdateAcceptMessage(messageId);
+                    await telegramService.SendOrUpdateAcceptMessage(payload);
                     break;
                 case BuzzerEvent.REJECTED:
                     twilioService.SendRejectionMessage(callSid);
-                    await telegramService.SendOrUpdateRejectMessage(messageId);
+                    await telegramService.SendOrUpdateRejectMessage(payload);
                     break;
                 case BuzzerEvent.TIMEOUT:
                     twilioService.SendApprovalRequestFallback(callSid);
-                    await telegramService.SendOrUpdateTimeoutMessage(messageId);
+                    await telegramService.SendOrUpdateTimeoutMessage(payload);
                     break;
                 case BuzzerEvent.COMPLETED:
-                    await telegramService.SendOrUpdateHangUpMessage(messageId);
+                    await telegramService.SendOrUpdateHangUpMessage(payload);
                     break;
                 case BuzzerEvent.ERROR:
                     twilioService.SendApprovalRequestFallback(callSid);
-                    await telegramService.SendOrUpdateErrorMessage(messageId);
+                    await telegramService.SendOrUpdateErrorMessage(payload);
                     break;
             }
         }
@@ -200,7 +205,7 @@ namespace BuzzerBot
             if (message.Value != null)
             {
                 await queueClient.DeleteMessageAsync(message.Value.MessageId, message.Value.PopReceipt);
-                await RaiseBuzzerEvent(BuzzerEvent.APPROVED, orchestrationClient);
+                await RaiseBuzzerEvent(orchestrationClient, BuzzerEvent.APPROVED);
                 return null;
             }
 
@@ -208,8 +213,9 @@ namespace BuzzerBot
         }
 
         private async Task RaiseBuzzerEvent(
+            IDurableOrchestrationClient orchestrationClient,
             BuzzerEvent buzzerEvent,
-            IDurableOrchestrationClient orchestrationClient)
+            BuzzerEventPayload payload = null)
         {
             OrchestrationStatusQueryResult result = await orchestrationClient.ListInstancesAsync(
                 new OrchestrationStatusQueryCondition { RuntimeStatus = new [] {OrchestrationRuntimeStatus.Running} },
@@ -223,8 +229,10 @@ namespace BuzzerBot
                 return;
             }
 
+            payload ??= new BuzzerEventPayload();
             string instanceId = instances.Single().InstanceId;
-            await orchestrationClient.RaiseEventAsync(instanceId, Functions.APPROVAL_EVENT, buzzerEvent);
+
+            await orchestrationClient.RaiseEventAsync(instanceId, Functions.BUZZER_EVENT, (buzzerEvent, payload));
         }
 
         private async Task ClearDurableFunctions(IDurableOrchestrationClient client)

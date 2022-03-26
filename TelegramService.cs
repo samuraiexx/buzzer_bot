@@ -30,26 +30,42 @@ namespace BuzzerBot
             return chatId == this.chatId;
         }
 
-        public BuzzerEvent GetBuzzerEventFromUpdate(Update update)
+        public (BuzzerEvent, BuzzerEventPayload) GetBuzzerEventFromUpdate(Update update)
         {
+            BuzzerEvent buzzerEvent;
             switch(update.Type)
             {
                 case UpdateType.Message:
-                    return IsScheduleApprovalCommand(update.Message) ?
+                    buzzerEvent = IsScheduleApprovalCommand(update.Message) ?
                         BuzzerEvent.SCHEDULE_APPROVAL :
                         BuzzerEvent.NOOP;
+                    return (buzzerEvent, null);
+
                 case UpdateType.CallbackQuery:
-                    switch(update.CallbackQuery.Data)
+
+                    var payload = new BuzzerEventPayload();
+                    payload.TelegramUserId = update.CallbackQuery.From.Id;
+                    payload.TelegramSenderName = GetUsername(update.CallbackQuery.From);
+
+
+                    switch (update.CallbackQuery.Data)
                     {
                         case "approve":
-                            return BuzzerEvent.APPROVED;
+                            buzzerEvent = BuzzerEvent.APPROVED;
+                            return (buzzerEvent, payload);
+
                         case "reject":
-                            return BuzzerEvent.REJECTED;
+                            buzzerEvent = BuzzerEvent.REJECTED;
+                            return (buzzerEvent, payload);
+
                         default:
-                            return BuzzerEvent.NOOP;
+                            buzzerEvent = BuzzerEvent.NOOP;
+                            return (buzzerEvent, null);
                     }
+
                 default:
-                    return BuzzerEvent.NOOP;
+                    buzzerEvent = BuzzerEvent.NOOP;
+                    return (buzzerEvent, null);
             }
         }
 
@@ -74,40 +90,51 @@ namespace BuzzerBot
             return message.MessageId;
         }
 
-        public async Task SendOrUpdateAcceptMessage(int? messageId)
+        public async Task SendOrUpdateAcceptMessage(BuzzerEventPayload payload)
         {
-            await SendOrUpdate("Request Accepted", messageId);
+            string message = "Request accepted";
+            if (payload.TelegramUserId != null)
+            {
+                message = message + $" by [{payload.TelegramSenderName}](tg://user?id={payload.TelegramUserId.Value})";
+            }
+
+            await SendOrUpdate(message, payload.TelegramMessageId);
         }
 
-        public async Task SendOrUpdateRejectMessage(int? messageId)
+        public async Task SendOrUpdateRejectMessage(BuzzerEventPayload payload)
         {
-            await SendOrUpdate("Request Denied", messageId);
+            string message = "Requested denied";
+            if (payload.TelegramUserId != null)
+            {
+                message = message + $" by [{payload.TelegramSenderName}](tg://user?id={payload.TelegramUserId.Value})";
+            }
+            await SendOrUpdate(message, payload.TelegramMessageId);
         }
 
-        public async Task SendOrUpdateTimeoutMessage(int? messageId)
+        public async Task SendOrUpdateTimeoutMessage(BuzzerEventPayload payload)
         {
-            await SendOrUpdate("Request Timed Out", messageId);
+            await SendOrUpdate("Request timed out", payload.TelegramMessageId);
         }
 
-        public async Task SendOrUpdateHangUpMessage(int? messageId)
+        public async Task SendOrUpdateHangUpMessage(BuzzerEventPayload payload)
         {
-            await SendOrUpdate("The Caller Hung Up", messageId);
+            await SendOrUpdate("The caller hung up", payload.TelegramMessageId);
         }
 
-        public async Task SendOrUpdateErrorMessage(int? messageId)
+        public async Task SendOrUpdateErrorMessage(BuzzerEventPayload payload)
         {
-            await SendOrUpdate("Request Failed =/", messageId);
+            await SendOrUpdate("Request failed =[", payload.TelegramMessageId);
         }
 
         private async Task SendOrUpdate(string message, int? messageId)
         {
             if (messageId.HasValue == false)
             {
-                await this.telegramBotClient.SendTextMessageAsync(chatId, message);
+                await this.telegramBotClient.SendTextMessageAsync(chatId, message, ParseMode.MarkdownV2);
                 return;
             }
 
-            await this.telegramBotClient.EditMessageTextAsync(chatId, messageId.Value, message);
+            await this.telegramBotClient.EditMessageTextAsync(chatId, messageId.Value, message, ParseMode.MarkdownV2);
         }
 
         private bool IsScheduleApprovalCommand(Message message)
@@ -123,6 +150,16 @@ namespace BuzzerBot
             }
 
             return false;
+        }
+
+        private string GetUsername(User user)
+        {
+            if (user.Username != null)
+            {
+                return $"@{user.Username}";
+            }
+
+            return user.FirstName ?? $"@{user.Id}";
         }
     }
 }
