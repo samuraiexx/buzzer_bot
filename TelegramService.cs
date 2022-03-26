@@ -89,6 +89,11 @@ namespace BuzzerBot
             await SendOrUpdate("Request Timed Out", messageId);
         }
 
+        public async Task SendOrUpdateHangUpMessage(int? messageId)
+        {
+            await SendOrUpdate("The Caller Hung Up", messageId);
+        }
+
         public async Task SendOrUpdateErrorMessage(int? messageId)
         {
             await SendOrUpdate("Request Failed =/", messageId);

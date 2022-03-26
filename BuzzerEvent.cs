@@ -12,6 +12,7 @@ namespace BuzzerBot
         REJECTED,
         SCHEDULE_APPROVAL,
         TIMEOUT,
+        COMPLETED,
         ERROR,
         NOOP,
     }

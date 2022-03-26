@@ -51,6 +51,12 @@ namespace BuzzerBot
             );
         }
 
+        public bool HasCallCompleted(string body)
+        {
+            CallResource callResource = CallResource.FromJson(body);
+            return callResource.Status == CallResource.StatusEnum.Completed;
+        }
+
         public void SendOpenDoorSignal(string callSid)
         {
             VoiceResponse response = new VoiceResponse()
@@ -91,7 +97,7 @@ namespace BuzzerBot
             };
         }
 
-        public static ContentResult GetWaitRoomResponse(string callSid)
+        public static ContentResult GetWaitRoomResponse()
         {
             VoiceResponse response = new VoiceResponse()
                 .Play(new Uri("http://com.twilio.music.guitars.s3.amazonaws.com/Pitx_-_A_Thought.mp3"));

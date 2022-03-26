@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,13 +50,42 @@ namespace BuzzerBot
                 await ClearDurableFunctions(orchestrationClient);
                 await orchestrationClient.StartNewAsync(nameof(ApprovalWorkflow), null, callSid);
 
-                return TwilioService.GetWaitRoomResponse(callSid);
+                return TwilioService.GetWaitRoomResponse();
             } catch(Exception e)
             {
                 logger.LogError("[TwilioHttpTrigger] Exception: " + e.Message);
                 return TwilioService.GetFallbackResponse();
             }
         }
+
+        [FunctionName("TwilioStatusUpdateHttpTrigger")]
+        public async Task<IActionResult> TwilioStatusUpdateHttpTrigger(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest request,
+            [DurableClient] IDurableOrchestrationClient orchestrationClient)
+        {
+            try
+            {
+                if(!twilioService.ValidateRequest(request))
+                {
+                    return new ForbidResult();
+                }
+
+                logger.LogInformation("Received a status update!");
+                string body = new StreamReader(request.Body).ReadToEnd();
+
+                if(twilioService.HasCallCompleted(body))
+                {
+                    await RaiseBuzzerEvent(BuzzerEvent.COMPLETED, orchestrationClient);
+                }
+
+                return new OkResult();
+            } catch(Exception e)
+            {
+                logger.LogError("[TwilioStatusUpdateHttpTrigger] Exception: " + e.Message);
+                throw;
+            }
+        }
+
 
         [FunctionName("TelegramHttpTrigger")]
         public async Task<IActionResult> TelegramHttpTrigger(
@@ -78,7 +108,7 @@ namespace BuzzerBot
                 {
                     case BuzzerEvent.APPROVED:
                     case BuzzerEvent.REJECTED:
-                        await RaiseApprovalEvent(action, orchestrationClient);
+                        await RaiseBuzzerEvent(action, orchestrationClient);
                         break;
                     case BuzzerEvent.SCHEDULE_APPROVAL:
                         await queueClient.SendMessageAsync(DateTime.Now.ToString(), timeToLive: TimeSpan.FromMinutes(60));
@@ -121,16 +151,16 @@ namespace BuzzerBot
                 {
                     buzzerEvent = BuzzerEvent.TIMEOUT;
                 }
-                await context.CallActivityAsync(nameof(ProcessApproval), (buzzerEvent, callSid, messageId));
+                await context.CallActivityAsync(nameof(ProcessBuzzerEvent), (buzzerEvent, callSid, messageId));
             } catch (Exception e)
             {
-                await context.CallActivityAsync(nameof(ProcessApproval), (BuzzerEvent.ERROR, callSid, (int?)null));
+                await context.CallActivityAsync(nameof(ProcessBuzzerEvent), (BuzzerEvent.ERROR, callSid, (int?)null));
                 logger.LogError("[ApprovalWorkflow] Exception: " + e.Message);
             }
         }
 
-        [FunctionName(nameof(ProcessApproval))]
-        public async Task ProcessApproval([ActivityTrigger] IDurableActivityContext context)
+        [FunctionName(nameof(ProcessBuzzerEvent))]
+        public async Task ProcessBuzzerEvent([ActivityTrigger] IDurableActivityContext context)
         {
             logger.LogInformation("Processing Approval");
             (BuzzerEvent buzzerEvent, string callSid, int? messageId) = context.GetInput<(BuzzerEvent, string, int?)>();
@@ -148,6 +178,9 @@ namespace BuzzerBot
                 case BuzzerEvent.TIMEOUT:
                     twilioService.SendApprovalRequestFallback(callSid);
                     await telegramService.SendOrUpdateTimeoutMessage(messageId);
+                    break;
+                case BuzzerEvent.COMPLETED:
+                    await telegramService.SendOrUpdateHangUpMessage(messageId);
                     break;
                 case BuzzerEvent.ERROR:
                     twilioService.SendApprovalRequestFallback(callSid);
@@ -167,14 +200,16 @@ namespace BuzzerBot
             if (message.Value != null)
             {
                 await queueClient.DeleteMessageAsync(message.Value.MessageId, message.Value.PopReceipt);
-                await RaiseApprovalEvent(BuzzerEvent.APPROVED, orchestrationClient);
+                await RaiseBuzzerEvent(BuzzerEvent.APPROVED, orchestrationClient);
                 return null;
             }
 
             return await telegramService.SendChooseMessage();
         }
 
-        private async Task RaiseApprovalEvent(BuzzerEvent buzzerEvent, IDurableOrchestrationClient orchestrationClient)
+        private async Task RaiseBuzzerEvent(
+            BuzzerEvent buzzerEvent,
+            IDurableOrchestrationClient orchestrationClient)
         {
             OrchestrationStatusQueryResult result = await orchestrationClient.ListInstancesAsync(
                 new OrchestrationStatusQueryCondition { RuntimeStatus = new [] {OrchestrationRuntimeStatus.Running} },
@@ -184,7 +219,7 @@ namespace BuzzerBot
 
             if (!instances.Any())
             {
-                logger.LogCritical("No ongoing calls found to approve/reject");
+                logger.LogInformation("No ongoing calls found to raise an event");
                 return;
             }
 
