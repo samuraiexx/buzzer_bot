@@ -1,15 +1,15 @@
-# buzzer_bot
+# Buzzer
 A complete system that consists of a Telegram Bot and a Twilio API that is able to handle Buzzer calls in a smart way.
 
-# Local Setup
+## Local Setup
 
-## Requirements
+### Requirements
 - Visual Studio 2022 (Azure Development .NET 6.0)
 - Ngrok
 - A [Telegram Bot](https://core.telegram.org/bots#6-botfather)
 - A [Twilio Account](https://www.twilio.com/) with an active number
 
-## Executing
+### Executing
 - Clone this repository
 - Edit local.setting.json and set all the empty variables
 - Start the Azure Function (BuzzerBot) on Visual Studio 2022
