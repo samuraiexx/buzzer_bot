@@ -40,7 +40,7 @@ namespace BuzzerBot
         {
             try
             {
-                if(!twilioService.ValidateRequest(request))
+                if(!twilioService.IsRequestValid(request))
                 {
                     return new ForbidResult();
                 }
@@ -65,7 +65,7 @@ namespace BuzzerBot
         {
             try
             {
-                if(!twilioService.ValidateRequest(request))
+                if(!twilioService.IsRequestValid(request))
                 {
                     return new ForbidResult();
                 }

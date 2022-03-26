@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Web;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
 using Twilio.Security;
@@ -13,18 +16,26 @@ namespace BuzzerBot
     public class TwilioService
     {
         private static readonly string fallbackNumber = Environment.GetEnvironmentVariable("FALLBACK_NUMBER");
-        private readonly string authToken;
 
-        public TwilioService()
+        private readonly string authToken;
+        private readonly IHostEnvironment hostEnvironment;
+
+        public TwilioService(IHostEnvironment hostEnvironmentParam)
         {
             string accountSid = Environment.GetEnvironmentVariable("TWILIO_ACCOUNT_SID");
             authToken = Environment.GetEnvironmentVariable("TWILIO_AUTH_TOKEN");
+            this.hostEnvironment = hostEnvironmentParam;
 
             TwilioClient.Init(accountSid, authToken);
         }
 
-        public bool ValidateRequest(HttpRequest request)
+        public bool IsRequestValid(HttpRequest request)
         {
+            if(hostEnvironment.IsDevelopment())
+            {
+                return true;
+            }
+
             RequestValidator validator = new RequestValidator(authToken);
             string signature = request.Headers["X-Twilio-Signature"];
             string url = UriHelper.GetDisplayUrl(request);
@@ -53,8 +64,8 @@ namespace BuzzerBot
 
         public bool HasCallCompleted(string body)
         {
-            CallResource callResource = CallResource.FromJson(body);
-            return callResource.Status == CallResource.StatusEnum.Completed;
+            NameValueCollection bodyCollection = HttpUtility.ParseQueryString(body);
+            return bodyCollection.Get("CallStatus") == "completed";
         }
 
         public void SendOpenDoorSignal(string callSid)
