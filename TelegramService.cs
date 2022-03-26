@@ -15,7 +15,7 @@ namespace BuzzerBot
         private readonly ILogger<TelegramService> logger;
         private readonly long chatId;
 
-        private const string acceptFirstCallInNextHourCommand = "acceptFirstCallInNextHour";
+        private const string acceptNextCallCommand = "acceptnextcall";
 
         public TelegramService(ITelegramBotClient telegramBotClientParam, ILogger<TelegramService> loggerParam)
         {
@@ -143,7 +143,7 @@ namespace BuzzerBot
             if (entity?.Type == MessageEntityType.BotCommand)
             {
                 string commandName = message.Text.Substring(1, entity.Length - 1);
-                if (commandName.Equals(acceptFirstCallInNextHourCommand, StringComparison.InvariantCultureIgnoreCase))
+                if (commandName.Equals(acceptNextCallCommand, StringComparison.InvariantCultureIgnoreCase))
                 {
                     return true;
                 }

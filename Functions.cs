@@ -112,7 +112,7 @@ namespace BuzzerBot
                         await RaiseBuzzerEvent(orchestrationClient, buzzerEvent, payload);
                         break;
                     case BuzzerEvent.SCHEDULE_APPROVAL:
-                        await queueClient.SendMessageAsync(DateTime.Now.ToString(), timeToLive: TimeSpan.FromMinutes(60));
+                        await QueueScheduledApproval(queueClient, update);
                         break;
                 }
             }
@@ -246,6 +246,17 @@ namespace BuzzerBot
                 .DurableOrchestrationState
                 .Select(instance => client.TerminateAsync(instance.InstanceId, "Cleaning all functions"))
             );
+        }
+
+        private async Task QueueScheduledApproval(QueueClient queueClient, Update update)
+        {
+            int timeout;
+
+            var args = update.Message.Text.Split(' ');
+
+            if (args.Length < 2 || !int.TryParse(args[1], out timeout)) timeout = 1;
+
+            await queueClient.SendMessageAsync(DateTime.Now.ToString(), timeToLive: TimeSpan.FromHours(timeout));
         }
     }
 }
