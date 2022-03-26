@@ -14,6 +14,7 @@ namespace BuzzerBot
         private readonly ITelegramBotClient telegramBotClient;
         private readonly ILogger<TelegramService> logger;
         private readonly long chatId;
+        private readonly string botUsername;
 
         private const string acceptNextCallCommand = "acceptnextcall";
 
@@ -22,6 +23,7 @@ namespace BuzzerBot
             this.telegramBotClient = telegramBotClientParam;
             this.logger = loggerParam;
             this.chatId = long.Parse(Environment.GetEnvironmentVariable("TELEGRAM_CHAT_ID", EnvironmentVariableTarget.Process));
+            this.botUsername = Environment.GetEnvironmentVariable("TELEGRAM_BOT_USERNAME", EnvironmentVariableTarget.Process);
         }
 
         public bool IsValid(Update update)
@@ -143,7 +145,8 @@ namespace BuzzerBot
             if (entity?.Type == MessageEntityType.BotCommand)
             {
                 string commandName = message.Text.Substring(1, entity.Length - 1);
-                if (commandName.Equals(acceptNextCallCommand, StringComparison.InvariantCultureIgnoreCase))
+                if (commandName.Equals(acceptNextCallCommand, StringComparison.InvariantCultureIgnoreCase) ||
+                    commandName.Equals($"{acceptNextCallCommand}@{botUsername}", StringComparison.InvariantCultureIgnoreCase))
                 {
                     return true;
                 }
