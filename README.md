@@ -11,10 +11,10 @@ A complete system that consists of a Telegram Bot and a Twilio API that is able 
 - A [Telegram Bot](https://core.telegram.org/bots#6-botfather)
 - A [Twilio Account](https://www.twilio.com/) with an active number
 
-### Executing
+### Quick Start
 
 1. Clone this repository
-2. Create local.setting.json file with the code bellow and replace all empty strings
+2. Create BuzzerBot/local.setting.json file with the code bellow and replace all empty strings
 
 ```
 {
