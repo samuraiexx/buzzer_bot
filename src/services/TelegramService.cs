@@ -17,6 +17,7 @@ namespace BuzzerBot
         private readonly string botUsername;
 
         private const string acceptNextCallCommand = "acceptnextcall";
+        private const string generateAccessLink = "generateaccesslink";
 
         public TelegramService(ITelegramBotClient telegramBotClientParam, ILogger<TelegramService> loggerParam)
         {
@@ -34,13 +35,19 @@ namespace BuzzerBot
 
         public (BuzzerEvent, BuzzerEventPayload) GetBuzzerEventFromUpdate(Update update)
         {
-            BuzzerEvent buzzerEvent;
+            BuzzerEvent buzzerEvent = BuzzerEvent.NOOP;
+
             switch(update.Type)
             {
                 case UpdateType.Message:
-                    buzzerEvent = IsScheduleApprovalCommand(update.Message) ?
-                        BuzzerEvent.SCHEDULE_APPROVAL :
-                        BuzzerEvent.NOOP;
+                    if (IsCommandType(update.Message, acceptNextCallCommand))
+                    {
+                         buzzerEvent = BuzzerEvent.SCHEDULE_APPROVAL;
+                    }
+                    else if(IsCommandType(update.Message, generateAccessLink))
+                    {
+                        buzzerEvent = BuzzerEvent.GENERATE_ACCESS_LINK;
+                    }
                     return (buzzerEvent, null);
 
                 case UpdateType.CallbackQuery:
@@ -66,7 +73,6 @@ namespace BuzzerBot
                     }
 
                 default:
-                    buzzerEvent = BuzzerEvent.NOOP;
                     return (buzzerEvent, null);
             }
         }
@@ -90,6 +96,18 @@ namespace BuzzerBot
                 replyMarkup: inlineKeyboard
             );
             return message.MessageId;
+        }
+
+        public async Task SendAccessLink(string accessLink)
+        {
+            var reservedChars = "-.=";
+            var scapedLink = accessLink;
+            foreach (char c in reservedChars)
+            {
+                scapedLink = scapedLink.Replace($"{c}", $"\\{c}");
+            }
+            var message = $"The access link is [{scapedLink}]({accessLink})";
+            await SendOrUpdate(message, null);
         }
 
         public async Task SendOrUpdateAcceptMessage(BuzzerEventPayload payload)
@@ -139,14 +157,14 @@ namespace BuzzerBot
             await this.telegramBotClient.EditMessageTextAsync(chatId, messageId.Value, message, ParseMode.MarkdownV2);
         }
 
-        private bool IsScheduleApprovalCommand(Message message)
+        private bool IsCommandType(Message message, string command)
         {
             MessageEntity entity = message?.Entities?.ElementAt(0);
             if (entity?.Type == MessageEntityType.BotCommand)
             {
                 string commandName = message.Text.Substring(1, entity.Length - 1);
-                if (commandName.Equals(acceptNextCallCommand, StringComparison.InvariantCultureIgnoreCase) ||
-                    commandName.Equals($"{acceptNextCallCommand}@{botUsername}", StringComparison.InvariantCultureIgnoreCase))
+                if (commandName.Equals(command, StringComparison.InvariantCultureIgnoreCase) ||
+                    commandName.Equals($"{command}@{botUsername}", StringComparison.InvariantCultureIgnoreCase))
                 {
                     return true;
                 }
