@@ -41,7 +41,7 @@ namespace BuzzerBot
 
         if (!telegramService.IsValid(update))
         {
-          return new ForbidResult();
+          return new OkResult();
         }
 
         (BuzzerEvent buzzerEvent, BuzzerEventPayload payload) = telegramService.GetBuzzerEventFromUpdate(update);
