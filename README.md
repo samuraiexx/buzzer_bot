@@ -26,6 +26,7 @@ A complete system that consists of a Telegram Bot and a Twilio API that is able 
     "TWILIO_AUTH_TOKEN": "",
     "FALLBACK_NUMBER": "",
     "TELEGRAM_BOT_TOKEN": "",
+    "TELEGRAM_BOT_USERNAME": "",
     "TELEGRAM_CHAT_ID": ""
   }
 }
