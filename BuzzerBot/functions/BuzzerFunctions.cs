@@ -35,7 +35,7 @@ namespace BuzzerBot
         int? messageId = await context.CallActivityAsync<int?>(nameof(RequestBuzzerApproval), null);
 
         using var timeoutCts = new CancellationTokenSource();
-        DateTime dueTime = context.CurrentUtcDateTime.AddSeconds(30);
+        DateTime dueTime = context.CurrentUtcDateTime.AddSeconds(15);
         Task durableTimeout = context.CreateTimer(dueTime, timeoutCts.Token);
 
         Task<(BuzzerEvent, BuzzerEventPayload)> approvalEvent = context.WaitForExternalEvent<(BuzzerEvent, BuzzerEventPayload)>(BuzzerEventManager.BUZZER_EVENT);
